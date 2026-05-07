@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>藏光療癒美學｜預約GOGO</title>
+<title>藏光療癒美學｜預約紀錄</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 :root{
@@ -139,9 +139,15 @@ main{padding:20px 24px 28px}
   cursor:default;
 }
 .mode-admin .slot{cursor:pointer}
-.slot.morning{background:var(--morning)}
-.slot.afternoon{background:var(--afternoon)}
-.slot.evening{background:var(--evening)}
+.slot{
+  background:transparent;
+  border:1px solid rgba(255,255,255,.12);
+}
+.slot.morning,
+.slot.afternoon,
+.slot.evening{
+  background:rgba(255,255,255,.08);
+}
 .status-available{color:var(--available)}
 .status-full{color:var(--full)}
 .status-unavailable{color:var(--unavailable)}
@@ -240,18 +246,48 @@ textarea{min-height:130px;line-height:1.7}
   .content{grid-template-columns:1fr}
   aside{border-left:none;border-top:1px solid var(--line)}
 }
+
 @media(max-width:760px){
   .app{padding:8px}
   #capture{border-radius:20px}
-  main{padding:10px;overflow-x:auto}
+  main{padding:10px;overflow-x:hidden}
+
   .calendar{
-    min-width:680px;
-    grid-template-columns:repeat(7,1fr);
+    width:100%;
+    min-width:0;
+    grid-template-columns:repeat(7,minmax(0,1fr));
   }
-  .day{min-height:116px;padding:5px}
-  .date{font-size:16px}
-  .slot{height:24px;font-size:12px;margin:4px 0;border-radius:7px}
-  .mode-admin .slot{height:36px}
+
+  .weekday{
+    height:32px;
+    font-size:14px;
+  }
+
+  .day{
+    min-height:92px;
+    padding:3px;
+  }
+
+  .date{
+    font-size:14px;
+    margin-bottom:3px;
+  }
+
+  .slot{
+    height:20px;
+    font-size:10px;
+    margin:3px 0;
+    border-radius:6px;
+  }
+
+  .mode-admin .slot{
+    height:30px;
+  }
+
+  .admin-detail{
+    font-size:8px;
+  }
+
   .month-title{font-size:24px}
   .brand-title{font-size:22px}
 }
@@ -417,13 +453,14 @@ aside{
 <div class="content">
   <main>
     <div class="calendar" id="calendar"></div>
-    <div class="quote">＊ 點選「可預約」可送出預約詢問，實際時間會由藏光療癒美學確認後回覆。＊</div>
+    <div class="quote">＊ 若有臨時調整，請以最新公告為主，感謝您的理解與配合，謝謝 ＊</div>
   </main>
   <aside>
     <div class="panel">
-      <h2>預約說明</h2>
-      <div class="menu-text" id="menuText">預約請私訊確認時間。
-若有特殊需求，可先告知身體狀態、想調整的方向或當日安排。</div>
+      <h2>本月公告</h2>
+      <div class="menu-text" id="menuText">• 預約時間以最後確認為主
+• 如需更改時間，請提前一天告知
+• 感謝你的理解與配合</div>
       <button class="edit-small no-capture" data-edit-text="menuText">編輯</button>
     </div>
     
@@ -442,10 +479,9 @@ aside{
     </div>
 
     <div class="panel">
-      <h2>本月公告</h2>
-      <div class="notice-text" id="noticeText">• 預約時間以最後確認為主
-• 如需更改時間，請提前一天告知
-• 感謝你的理解與配合</div>
+      <h2>預約說明</h2>
+      <div class="notice-text" id="noticeText">預約請私訊確認時間。
+若有特殊需求，可先告知身體狀態、想調整的方向或當日安排。</div>
       <button class="edit-small no-capture" data-edit-text="noticeText">編輯公告</button>
     </div>
   </aside>
@@ -486,34 +522,6 @@ aside{
   </div>
 </div>
 
-
-<div class="modal no-capture" id="inquiryModal">
-  <div class="modal-box">
-    <h3 id="inquiryTitle">預約詢問</h3>
-    <div class="row">
-      <label>姓名</label>
-      <input id="inquiryName" placeholder="例：王小姐">
-    </div>
-    <div class="row">
-      <label>聯絡方式（非 LINE 入口可填）</label>
-      <input id="inquiryContact" placeholder="例：IG帳號／電話／LINE名稱，可不填">
-    </div>
-    <div class="row">
-      <label>想預約項目</label>
-      <input id="inquiryService" placeholder="例：臉部保養、牌卡療癒、花晶調頻">
-    </div>
-    <div class="row">
-      <label>特殊需求／備註</label>
-      <textarea id="inquiryNote" placeholder="例：第一次預約、身體狀態、想調整的方向"></textarea>
-    </div>
-    <div class="actions">
-      <button id="closeInquiry">取消</button>
-      <button id="sendInquiry">送出詢問</button>
-    </div>
-    <div class="sync" style="padding:10px 0 0" id="inquiryHint">送出後不代表預約成立，會由藏光療癒美學確認後回覆。</div>
-  </div>
-</div>
-
 <div class="modal no-capture" id="textModal">
   <div class="modal-box">
     <h3 id="textTitle">編輯文字</h3>
@@ -531,8 +539,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/fireba
 import {
   getFirestore,
   doc,
-  collection,
-  addDoc,
   onSnapshot,
   setDoc,
   serverTimestamp
@@ -572,8 +578,6 @@ import {
   let mode = "view";
   let selectedDate = "";
   let selectedSlot = "";
-  let inquiryDate = "";
-  let inquirySlot = "";
   let editingTextId = "";
   let adminName = localStorage.getItem(STORAGE + "adminName") || "";
   let unsubscribe = null;
@@ -662,7 +666,12 @@ import {
       let content = `<div class="date">${d}</div>`;
 
       slots.forEach(s=>{
-        const info = obj[s] || {status:"available"};
+        const isWeekend = dow === 0 || dow === 6;
+const defaultStatus = (s === "evening" || isWeekend)
+  ? "available"
+  : "unavailable";
+
+const info = obj[s] || {status: defaultStatus};
         const st = info.status || "available";
         const detail = [info.name, info.service].filter(Boolean).join("｜");
 
@@ -678,18 +687,8 @@ import {
 
     document.querySelectorAll(".slot").forEach(el=>{
       el.onclick = () => {
-        const date = el.dataset.date;
-        const slot = el.dataset.slot;
-
-        if(mode === "admin"){
-          openSlot(date, slot);
-          return;
-        }
-
-        const visibleStatus = el.querySelector(".status-text")?.textContent || "";
-        if(visibleStatus === "可預約"){
-          openInquiry(date, slot);
-        }
+        if(mode !== "admin") return;
+        openSlot(el.dataset.date, el.dataset.slot);
       };
     });
 
@@ -724,74 +723,6 @@ import {
       const el = document.getElementById("syncStatus");
       if(el) el.textContent = "Firebase 讀取失敗：" + error.message;
     });
-  }
-
-  function openInquiry(date, slot){
-    inquiryDate = date;
-    inquirySlot = slot;
-
-    document.getElementById("inquiryTitle").textContent = `${date}｜${slotName[slot]} 預約詢問`;
-    document.getElementById("inquiryName").value = "";
-    document.getElementById("inquiryContact").value = "";
-    document.getElementById("inquiryService").value = "";
-    document.getElementById("inquiryNote").value = "";
-    document.getElementById("inquiryHint").textContent = "送出後不代表預約成立，會由藏光療癒美學確認後回覆。";
-    document.getElementById("inquiryModal").classList.add("show");
-  }
-
-  function closeInquiry(){
-    document.getElementById("inquiryModal").classList.remove("show");
-  }
-
-  async function sendInquiry(){
-    const name = document.getElementById("inquiryName").value.trim();
-    const contact = document.getElementById("inquiryContact").value.trim();
-    const service = document.getElementById("inquiryService").value.trim();
-    const note = document.getElementById("inquiryNote").value.trim();
-
-    if(!name){
-      alert("請先填寫姓名");
-      return;
-    }
-
-    if(!service){
-      alert("請先填寫想預約項目");
-      return;
-    }
-
-    await addDoc(collection(db, "bookingRequests"), {
-      brand: "藏光療癒美學",
-      source: "booking-page",
-      name,
-      contact,
-      date: inquiryDate,
-      period: inquirySlot,
-      periodLabel: slotName[inquirySlot],
-      service,
-      note,
-      status: "pending",
-      createdAt: serverTimestamp()
-    });
-
-    await fetch("https://line-booking-notify.notrainbowfish.workers.dev", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        brand: "藏光療癒美學",
-        name,
-        contact,
-        date: inquiryDate,
-        period: inquirySlot,
-        periodLabel: slotName[inquirySlot],
-        service,
-        note
-      })
-    });
-
-    document.getElementById("inquiryHint").textContent = "已收到您的預約詢問，實際時間將由藏光療癒美學確認後回覆。";
-    setTimeout(closeInquiry, 900);
   }
 
   function openSlot(date, slot){
@@ -836,8 +767,6 @@ import {
   };
 
   document.getElementById("closeSlot").onclick = closeSlot;
-  document.getElementById("closeInquiry").onclick = closeInquiry;
-  document.getElementById("sendInquiry").onclick = sendInquiry;
 
   document.getElementById("adminBtn").onclick = () => {
     const pwd = prompt("請輸入管理密碼");
