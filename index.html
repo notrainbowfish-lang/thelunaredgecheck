@@ -453,7 +453,7 @@ aside{
 <div class="content">
   <main>
     <div class="calendar" id="calendar"></div>
-    <div class="quote">＊ 若有臨時調整，請以最新公告為主，感謝您的理解與配合，謝謝 ＊</div>
+    <div class="quote">＊ 點選「可預約」可送出預約詢問，可於表單內切換其他可預約日期與時段。＊</div>
   </main>
   <aside>
     <div class="panel">
@@ -522,6 +522,42 @@ aside{
   </div>
 </div>
 
+
+<div class="modal no-capture" id="inquiryModal">
+  <div class="modal-box">
+    <h3 id="inquiryTitle">預約詢問</h3>
+    <div class="row">
+      <label>姓名</label>
+      <input id="inquiryName" placeholder="例：王小姐">
+    </div>
+    <div class="row">
+      <label>聯絡方式（非 LINE 入口可填）</label>
+      <input id="inquiryContact" placeholder="例：IG帳號／電話／LINE名稱，可不填">
+    </div>
+    <div class="row">
+      <label>日期</label>
+      <select id="inquiryDateSelect"></select>
+    </div>
+    <div class="row">
+      <label>時段</label>
+      <select id="inquiryPeriodSelect"></select>
+    </div>
+    <div class="row">
+      <label>想預約項目</label>
+      <input id="inquiryService" placeholder="例：牌卡療癒、花晶調頻">
+    </div>
+    <div class="row">
+      <label>特殊需求／備註</label>
+      <textarea id="inquiryNote" placeholder="例：第一次預約、身體狀態、想調整的方向"></textarea>
+    </div>
+    <div class="actions">
+      <button id="closeInquiry">取消</button>
+      <button id="sendInquiry">送出詢問</button>
+    </div>
+    <div class="sync" style="padding:10px 0 0" id="inquiryHint">送出後會開啟京采美緹官方 LINE，請在 LINE 內送出訊息，實際時間以回覆確認為主。</div>
+  </div>
+</div>
+
 <div class="modal no-capture" id="textModal">
   <div class="modal-box">
     <h3 id="textTitle">編輯文字</h3>
@@ -539,6 +575,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/fireba
 import {
   getFirestore,
   doc,
+  collection,
+  addDoc,
   onSnapshot,
   setDoc,
   serverTimestamp
@@ -578,6 +616,8 @@ import {
   let mode = "view";
   let selectedDate = "";
   let selectedSlot = "";
+  let inquiryDate = "";
+  let inquirySlot = "";
   let editingTextId = "";
   let adminName = localStorage.getItem(STORAGE + "adminName") || "";
   let unsubscribe = null;
@@ -687,17 +727,18 @@ const info = obj[s] || {status: defaultStatus};
 
     document.querySelectorAll(".slot").forEach(el=>{
       el.onclick = () => {
+        const date = el.dataset.date;
+        const slot = el.dataset.slot;
+
         if(mode === "admin"){
-          openSlot(el.dataset.date, el.dataset.slot);
+          openSlot(date, slot);
           return;
         }
 
-        const statusText = el.querySelector(".status-text");
-        if(!statusText || !statusText.classList.contains("status-available")){
-          return;
+        const statusEl = el.querySelector(".status-text");
+        if(statusEl && statusEl.classList.contains("status-available")){
+          openInquiry(date, slot);
         }
-
-        openInquiry(el.dataset.date, el.dataset.slot);
       };
     });
 
@@ -732,6 +773,130 @@ const info = obj[s] || {status: defaultStatus};
       const el = document.getElementById("syncStatus");
       if(el) el.textContent = "Firebase 讀取失敗：" + error.message;
     });
+  }
+
+  function getAvailableMap(){
+    const availableMap = {};
+
+    document.querySelectorAll(".slot").forEach(el => {
+      const statusEl = el.querySelector(".status-text");
+      if(statusEl && statusEl.classList.contains("status-available")){
+        const d = el.dataset.date;
+        const s = el.dataset.slot;
+
+        if(!availableMap[d]) availableMap[d] = [];
+        if(!availableMap[d].includes(s)){
+          availableMap[d].push(s);
+        }
+      }
+    });
+
+    return availableMap;
+  }
+
+  function openInquiry(date, slot){
+    inquiryDate = date;
+    inquirySlot = slot;
+
+    const dateSelect = document.getElementById("inquiryDateSelect");
+    const periodSelect = document.getElementById("inquiryPeriodSelect");
+    const availableMap = getAvailableMap();
+    const dateKeys = Object.keys(availableMap).sort();
+
+    dateSelect.innerHTML = "";
+    dateKeys.forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d;
+      opt.textContent = d;
+      dateSelect.appendChild(opt);
+    });
+
+    function renderPeriods(selectedDate){
+      periodSelect.innerHTML = "";
+      (availableMap[selectedDate] || []).forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s;
+        opt.textContent = slotName[s];
+        periodSelect.appendChild(opt);
+      });
+    }
+
+    dateSelect.onchange = () => {
+      renderPeriods(dateSelect.value);
+    };
+
+    dateSelect.value = availableMap[date] ? date : (dateKeys[0] || "");
+    renderPeriods(dateSelect.value);
+
+    if((availableMap[dateSelect.value] || []).includes(slot)){
+      periodSelect.value = slot;
+    }
+
+    document.getElementById("inquiryTitle").textContent = "預約詢問";
+    document.getElementById("inquiryName").value = "";
+    document.getElementById("inquiryContact").value = "";
+    document.getElementById("inquiryService").value = "";
+    document.getElementById("inquiryNote").value = "";
+    document.getElementById("inquiryHint").textContent = "送出後會開啟京采美緹官方 LINE，請在 LINE 內送出訊息，實際時間以回覆確認為主。";
+    document.getElementById("inquiryModal").classList.add("show");
+  }
+
+  function closeInquiry(){
+    document.getElementById("inquiryModal").classList.remove("show");
+  }
+
+  async function sendInquiry(){
+    const name = document.getElementById("inquiryName").value.trim();
+    const contact = document.getElementById("inquiryContact").value.trim();
+    const selectedDate = document.getElementById("inquiryDateSelect").value;
+    const selectedSlot = document.getElementById("inquiryPeriodSelect").value;
+    const service = document.getElementById("inquiryService").value.trim();
+    const note = document.getElementById("inquiryNote").value.trim();
+
+    if(!name){
+      alert("請先填寫姓名");
+      return;
+    }
+
+    if(!service){
+      alert("請先填寫想預約項目");
+      return;
+    }
+
+    await addDoc(collection(db, "bookingRequests"), {
+      brand: "藏光療癒美學",
+      source: "booking-page",
+      name,
+      contact,
+      date: selectedDate,
+      period: selectedSlot,
+      periodLabel: slotName[selectedSlot],
+      service,
+      note,
+      status: "pending",
+      createdAt: serverTimestamp()
+    });
+
+    const message =
+`您好，我想預約：
+
+【藏光療癒美學】預約詢問
+姓名：${name}
+聯絡方式：${contact || "未填寫"}
+日期：${selectedDate}
+時段：${slotName[selectedSlot]}
+項目：${service}
+
+特殊需求／備註：
+${note || "無"}
+
+＊實際預約時間請以京采美緹確認回覆為主。`;
+
+    const lineUrl = "https://line.me/R/oaMessage/%40673aexfc/?" + encodeURIComponent(message);
+    window.location.href = lineUrl;
+
+    document.getElementById("inquiryHint").textContent = "即將開啟京采美緹官方 LINE，請在 LINE 內送出預約訊息。";
+    setTimeout(closeInquiry, 900);
   }
 
   function openSlot(date, slot){
@@ -776,6 +941,8 @@ const info = obj[s] || {status: defaultStatus};
   };
 
   document.getElementById("closeSlot").onclick = closeSlot;
+  document.getElementById("closeInquiry").onclick = closeInquiry;
+  document.getElementById("sendInquiry").onclick = sendInquiry;
 
   document.getElementById("adminBtn").onclick = () => {
     const pwd = prompt("請輸入管理密碼");
@@ -861,152 +1028,10 @@ const info = obj[s] || {status: defaultStatus};
     a.click();
   };
 
-
-  function openInquiry(date, slot){
-    const dateSelect = document.getElementById("inqDate");
-    const periodSelect = document.getElementById("inqPeriod");
-
-    dateSelect.innerHTML = "";
-    periodSelect.innerHTML = "";
-
-    const availableMap = {};
-
-    document.querySelectorAll(".slot-card").forEach(card => {
-      const statusText = card.querySelector(".status-text");
-
-      if(statusText && statusText.classList.contains("status-available")){
-        const d = card.dataset.date;
-        const s = card.dataset.slot;
-
-        if(!availableMap[d]) availableMap[d] = [];
-        if(!availableMap[d].includes(s)){
-          availableMap[d].push(s);
-        }
-      }
-    });
-
-    Object.keys(availableMap).sort().forEach(d => {
-      const opt = document.createElement("option");
-      opt.value = d;
-      opt.textContent = d;
-      dateSelect.appendChild(opt);
-    });
-
-    function renderPeriods(selectedDate){
-      periodSelect.innerHTML = "";
-
-      (availableMap[selectedDate] || []).forEach(s => {
-        const opt = document.createElement("option");
-        opt.value = s;
-        opt.textContent = slotName[s];
-        periodSelect.appendChild(opt);
-      });
-    }
-
-    dateSelect.onchange = () => {
-      renderPeriods(dateSelect.value);
-    };
-
-    dateSelect.value = date;
-    renderPeriods(date);
-
-    if((availableMap[date] || []).includes(slot)){
-      periodSelect.value = slot;
-    }
-
-    document.getElementById("inqName").value = "";
-    document.getElementById("inqContact").value = "";
-    document.getElementById("inqService").value = "";
-    document.getElementById("inqNote").value = "";
-
-    document.getElementById("inquiryModal").classList.add("show");
-  }
-
-  document.getElementById("closeInquiry").onclick = () => {
-    document.getElementById("inquiryModal").classList.remove("show");
-  };
-
-  document.getElementById("sendInquiry").onclick = () => {
-    const name = document.getElementById("inqName").value.trim();
-    const contact = document.getElementById("inqContact").value.trim();
-    const date = document.getElementById("inqDate").value.trim();
-    const periodKey = document.getElementById("inqPeriod").value;
-    const period = slotName[periodKey] || periodKey;
-    const service = document.getElementById("inqService").value.trim();
-    const note = document.getElementById("inqNote").value.trim();
-
-    if(!name){
-      alert("請先輸入姓名");
-      return;
-    }
-
-    const message =
-`您好，我想預約：
-
-【藏光療癒美學】預約詢問
-姓名：${name}
-聯絡方式：${contact || "未填寫"}
-日期：${date}
-時段：${period}
-項目：${service || "未填寫"}
-
-特殊需求／備註：
-${note || "無"}
-
-＊實際預約時間請以京采美緹確認回覆為主。`;
-
-    const lineUrl = "https://line.me/R/oaMessage/%40673aexfc/?" + encodeURIComponent(message);
-
-    window.location.href = lineUrl;
-  };
-
-
   setMode("view");
   subscribeMonth();
 })();
 </script>
-
-
-<div class="modal no-capture" id="inquiryModal">
-  <div class="modal-box">
-    <h3>預約詢問</h3>
-
-    <div class="row">
-      <label>姓名</label>
-      <input id="inqName" placeholder="請輸入姓名">
-    </div>
-
-    <div class="row">
-      <label>聯絡方式</label>
-      <input id="inqContact" placeholder="LINE／電話">
-    </div>
-
-    <div class="row">
-      <label>日期</label>
-      <select id="inqDate"></select>
-    </div>
-
-    <div class="row">
-      <label>時段</label>
-      <select id="inqPeriod"></select>
-    </div>
-
-    <div class="row">
-      <label>想預約的項目</label>
-      <input id="inqService" placeholder="例：牌卡療癒、花晶調頻">
-    </div>
-
-    <div class="row">
-      <label>特殊需求／備註</label>
-      <textarea id="inqNote" placeholder="可填寫身體狀態、想調整方向"></textarea>
-    </div>
-
-    <div class="actions">
-      <button id="closeInquiry">取消</button>
-      <button id="sendInquiry">送出預約</button>
-    </div>
-  </div>
-</div>
 
 </body>
 </html>
