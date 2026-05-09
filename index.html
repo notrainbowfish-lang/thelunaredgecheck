@@ -687,8 +687,17 @@ const info = obj[s] || {status: defaultStatus};
 
     document.querySelectorAll(".slot").forEach(el=>{
       el.onclick = () => {
-        if(mode !== "admin") return;
-        openSlot(el.dataset.date, el.dataset.slot);
+        if(mode === "admin"){
+          openSlot(el.dataset.date, el.dataset.slot);
+          return;
+        }
+
+        const statusText = el.querySelector(".status-text");
+        if(!statusText || !statusText.classList.contains("status-available")){
+          return;
+        }
+
+        openInquiry(el.dataset.date, el.dataset.slot);
       };
     });
 
@@ -852,10 +861,102 @@ const info = obj[s] || {status: defaultStatus};
     a.click();
   };
 
+
+  function openInquiry(date, slot){
+    document.getElementById("inqDate").value = date;
+    document.getElementById("inqPeriod").value = slotName[slot];
+    document.getElementById("inqName").value = "";
+    document.getElementById("inqContact").value = "";
+    document.getElementById("inqService").value = "";
+    document.getElementById("inqNote").value = "";
+
+    document.getElementById("inquiryModal").classList.add("show");
+  }
+
+  document.getElementById("closeInquiry").onclick = () => {
+    document.getElementById("inquiryModal").classList.remove("show");
+  };
+
+  document.getElementById("sendInquiry").onclick = () => {
+    const name = document.getElementById("inqName").value.trim();
+    const contact = document.getElementById("inqContact").value.trim();
+    const date = document.getElementById("inqDate").value.trim();
+    const period = document.getElementById("inqPeriod").value.trim();
+    const service = document.getElementById("inqService").value.trim();
+    const note = document.getElementById("inqNote").value.trim();
+
+    if(!name){
+      alert("請先輸入姓名");
+      return;
+    }
+
+    const message =
+`您好，我想預約：
+
+【藏光療癒美學】預約詢問
+姓名：${name}
+聯絡方式：${contact || "未填寫"}
+日期：${date}
+時段：${period}
+項目：${service || "未填寫"}
+
+特殊需求／備註：
+${note || "無"}
+
+＊實際預約時間請以京采美緹確認回覆為主。`;
+
+    const lineUrl = "https://line.me/R/oaMessage/%40673aexfc/?" + encodeURIComponent(message);
+
+    window.location.href = lineUrl;
+  };
+
+
   setMode("view");
   subscribeMonth();
 })();
 </script>
+
+
+<div class="modal no-capture" id="inquiryModal">
+  <div class="modal-box">
+    <h3>預約詢問</h3>
+
+    <div class="row">
+      <label>姓名</label>
+      <input id="inqName" placeholder="請輸入姓名">
+    </div>
+
+    <div class="row">
+      <label>聯絡方式</label>
+      <input id="inqContact" placeholder="LINE／電話">
+    </div>
+
+    <div class="row">
+      <label>日期</label>
+      <input id="inqDate" readonly>
+    </div>
+
+    <div class="row">
+      <label>時段</label>
+      <input id="inqPeriod" readonly>
+    </div>
+
+    <div class="row">
+      <label>想預約的項目</label>
+      <input id="inqService" placeholder="例：牌卡療癒、花晶調頻">
+    </div>
+
+    <div class="row">
+      <label>特殊需求／備註</label>
+      <textarea id="inqNote" placeholder="可填寫身體狀態、想調整方向"></textarea>
+    </div>
+
+    <div class="actions">
+      <button id="closeInquiry">取消</button>
+      <button id="sendInquiry">送出預約</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
