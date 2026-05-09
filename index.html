@@ -863,8 +863,57 @@ const info = obj[s] || {status: defaultStatus};
 
 
   function openInquiry(date, slot){
-    document.getElementById("inqDate").value = date;
-    document.getElementById("inqPeriod").value = slotName[slot];
+    const dateSelect = document.getElementById("inqDate");
+    const periodSelect = document.getElementById("inqPeriod");
+
+    dateSelect.innerHTML = "";
+    periodSelect.innerHTML = "";
+
+    const availableMap = {};
+
+    document.querySelectorAll(".slot-card").forEach(card => {
+      const statusText = card.querySelector(".status-text");
+
+      if(statusText && statusText.classList.contains("status-available")){
+        const d = card.dataset.date;
+        const s = card.dataset.slot;
+
+        if(!availableMap[d]) availableMap[d] = [];
+        if(!availableMap[d].includes(s)){
+          availableMap[d].push(s);
+        }
+      }
+    });
+
+    Object.keys(availableMap).sort().forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d;
+      opt.textContent = d;
+      dateSelect.appendChild(opt);
+    });
+
+    function renderPeriods(selectedDate){
+      periodSelect.innerHTML = "";
+
+      (availableMap[selectedDate] || []).forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s;
+        opt.textContent = slotName[s];
+        periodSelect.appendChild(opt);
+      });
+    }
+
+    dateSelect.onchange = () => {
+      renderPeriods(dateSelect.value);
+    };
+
+    dateSelect.value = date;
+    renderPeriods(date);
+
+    if((availableMap[date] || []).includes(slot)){
+      periodSelect.value = slot;
+    }
+
     document.getElementById("inqName").value = "";
     document.getElementById("inqContact").value = "";
     document.getElementById("inqService").value = "";
@@ -881,7 +930,8 @@ const info = obj[s] || {status: defaultStatus};
     const name = document.getElementById("inqName").value.trim();
     const contact = document.getElementById("inqContact").value.trim();
     const date = document.getElementById("inqDate").value.trim();
-    const period = document.getElementById("inqPeriod").value.trim();
+    const periodKey = document.getElementById("inqPeriod").value;
+    const period = slotName[periodKey] || periodKey;
     const service = document.getElementById("inqService").value.trim();
     const note = document.getElementById("inqNote").value.trim();
 
@@ -933,12 +983,12 @@ ${note || "無"}
 
     <div class="row">
       <label>日期</label>
-      <input id="inqDate" readonly>
+      <select id="inqDate"></select>
     </div>
 
     <div class="row">
       <label>時段</label>
-      <input id="inqPeriod" readonly>
+      <select id="inqPeriod"></select>
     </div>
 
     <div class="row">
