@@ -511,6 +511,15 @@ aside{
       <input id="serviceName" placeholder="例：臉部保養、牌卡、療癒">
     </div>
     <div class="row">
+      <label>使用空間</label>
+      <select id="spaceRoom">
+        <option value="">尚未指定</option>
+        <option value="front39">39前</option>
+        <option value="back39">39後</option>
+        <option value="room41">41</option>
+      </select>
+    </div>
+    <div class="row">
       <label>特殊需求／備註</label>
       <textarea id="specialNote" placeholder="例：第一次來、肩頸敏感、想安靜放鬆"></textarea>
     </div>
@@ -601,6 +610,7 @@ import {
   const slots = ["morning","afternoon","evening"];
   const slotName = {morning:"上午",afternoon:"下午",evening:"晚上"};
   const statusText = {available:"可預約",full:"已約滿",unavailable:"不可預約",closed:"公休"};
+  const spaceRoomText = {front39:"39前",back39:"39後",room41:"41"};
 
   const defaultData = {
     days:{},
@@ -713,7 +723,8 @@ const defaultStatus = (s === "evening" || isWeekend)
 
 const info = obj[s] || {status: defaultStatus};
         const st = info.status || "available";
-        const detail = [info.name, info.service].filter(Boolean).join("｜");
+        const spaceLabel = info.spaceRoom ? spaceRoomText[info.spaceRoom] : "";
+        const detail = [spaceLabel, info.name, info.service].filter(Boolean).join("｜");
 
         content += `<div class="slot ${s}" data-date="${dk}" data-slot="${s}">
           <span class="status-text status-${st}">${statusText[st]}</span>
@@ -908,6 +919,7 @@ ${note || "無"}
     document.getElementById("slotStatus").value = info.status || "available";
     document.getElementById("clientName").value = info.name || "";
     document.getElementById("serviceName").value = info.service || "";
+    document.getElementById("spaceRoom").value = info.spaceRoom || "";
     document.getElementById("specialNote").value = info.note || "";
     document.getElementById("slotModal").classList.add("show");
   }
@@ -923,6 +935,8 @@ ${note || "無"}
       status: document.getElementById("slotStatus").value,
       name: document.getElementById("clientName").value.trim(),
       service: document.getElementById("serviceName").value.trim(),
+      spaceRoom: document.getElementById("spaceRoom").value,
+      spaceRoomLabel: spaceRoomText[document.getElementById("spaceRoom").value] || "",
       note: document.getElementById("specialNote").value.trim()
     };
 
